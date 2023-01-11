@@ -6,72 +6,56 @@ Usage:
 """
 import requests
 import json
+from operator import itemgetter
 from datetime import datetime, date
-from docopt import docopt
-args = docopt(__doc__)
 
-headers = {'User-Agent':'Mozilla/5.0 (X11; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0',
-'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-'Accept-Language':'sv-SE,sv;q=0.8,en-US;q=0.5,en;q=0.3',
-'Accept-Encoding':'gzip, deflate, br',
-'Connection':'keep-alive',
-'Upgrade-Insecure-Requests':'1',
-'Sec-Fetch-Dest':'document',
-'Sec-Fetch-Mode':'navigate',
-'Sec-Fetch-Site':'none',
-'Sec-Fetch-User':'1',
-'TE':'trailers'
-}
-user = args["<username>"]
-pwd = args["<password>"]
+def login(user, pwd):
+  headers = {'User-Agent':'Mozilla/5.0 (X11; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0',
+    'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language':'sv-SE,sv;q=0.8,en-US;q=0.5,en;q=0.3',
+    'Accept-Encoding':'gzip, deflate, br',
+    'Connection':'keep-alive',
+    'Upgrade-Insecure-Requests':'1',
+    'Sec-Fetch-Dest':'document',
+    'Sec-Fetch-Mode':'navigate',
+    'Sec-Fetch-Site':'none',
+    'Sec-Fetch-User':'1',
+    'TE':'trailers'
+  }
 
-s = requests.Session()
+  s = requests.Session()
+  r = s.get('https://auth.vklass.se/saml/initiate?idp=https%3A%2F%2Fauth.goteborg.se%2Fidp%2Fsps%2Fskola%2Fsaml20&org=189', headers = headers)
 
-r = s.get('https://auth.vklass.se/saml/initiate?idp=https%3A%2F%2Fauth.goteborg.se%2Fidp%2Fsps%2Fskola%2Fsaml20&org=189', headers = headers)
-#print(r.status_code)
-#print(r.content)
-#print(requests.utils.dict_from_cookiejar(s.cookies))
+  headers["Host"] = "auth.goteborg.se"
+  headers["Origin"] = "https://auth.goteborg.se"
+  headers["Referer"] = "https://auth.goteborg.se/auth/login"
+  cookie_obj = requests.cookies.create_cookie(name="WASReqURL",value="http:///auth/Responder")
+  s.cookies.set_cookie(cookie_obj)
 
-headers["Host"] = "auth.goteborg.se"
-headers["Origin"] = "https://auth.goteborg.se"
-headers["Referer"] = "https://auth.goteborg.se/auth/login"
-cookie_obj = requests.cookies.create_cookie(name="WASReqURL",value="http:///auth/Responder")
-s.cookies.set_cookie(cookie_obj)
+  r2 = s.post('https://auth.goteborg.se/auth/j_security_check', data={'j_username':user,'j_password':pwd,'pw':'','login':'Logga in'}, headers = headers)
+  if r2.text.__contains__('name="SAMLResponse" value="'):
+    saml = r2.text.split('name="SAMLResponse" value="')[1].split('"')[0]
+  else:
+    raise Exception("Fel lösenord / användarnamn")
 
-r2 = s.post('https://auth.goteborg.se/auth/j_security_check', data={'j_username':user,'j_password':pwd,'pw':'','login':'Logga in'}, headers = headers)
-#print(r2.status_code)
-#print(r2.content)
-if r2.text.__contains__('name="SAMLResponse" value="'):
-  saml = r2.text.split('name="SAMLResponse" value="')[1].split('"')[0]
-else:
-  print("Fel lösenord / användarnamn")
-  exit()
+  headers["Origin"] = "https://auth.goteborg.se"
+  headers["Referer"] = "https://auth.goteborg.se/"
 
-headers["Origin"] = "https://auth.goteborg.se"
-headers["Referer"] = "https://auth.goteborg.se/"
 
-#print(requests.utils.dict_from_cookiejar(s.cookies))
-
-kakor = requests.utils.dict_from_cookiejar(s.cookies)
-kakorlogin = {
+  kakor = requests.utils.dict_from_cookiejar(s.cookies)
+  kakorlogin = {
 	"saml-session":kakor["saml-session"],
 	"_tpc_persistance_cookie":kakor["_tpc_persistance_cookie"],
         "BBN01b9bc29":kakor["BBN01b9bc29"],
-}
-#print("\n\n")
-#print(kakorlogin)
+  }
 
-s2 = requests.Session()
-requests.utils.add_dict_to_cookiejar(s2.cookies,kakorlogin)
-#print({"RelayState":"","SAMLResponse":saml})
-headers["Host"] = "auth.vklass.se"
-r3 = s2.post('https://auth.vklass.se/saml/assertion', data={"RelayState":"","SAMLResponse":saml}, headers = headers)
-#print(r3.request.headers)
-#print(r3.content)
-#print(requests.utils.dict_from_cookiejar(s2.cookies))
+  s2 = requests.Session()
+  requests.utils.add_dict_to_cookiejar(s2.cookies,kakorlogin)
+  headers["Host"] = "auth.vklass.se"
+  r3 = s2.post('https://auth.vklass.se/saml/assertion', data={"RelayState":"","SAMLResponse":saml}, headers = headers)
 
-r4 = s2.get("https://www.vklass.se/")
-#print(r4.content)
+  r4 = s2.get("https://www.vklass.se/")
+  return s2
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -81,8 +65,8 @@ def json_serial(obj):
     raise TypeError ("Type %s not serializable" % type(obj))
 
 
-def getNarvaro(id):
-  r5 = s2.get("https://www.vklass.se/statistics/attendanceDetailed.aspx?userUID="+id)
+def getNarvaro(s,id):
+  r5 = s.get("https://www.vklass.se/statistics/attendanceDetailed.aspx?userUID="+id)
   lista = []
   for data in r5.text.split("_manualCloseButtonText"):
     row = data.split('"text"')[1].split('}')[0]
@@ -109,10 +93,10 @@ def getNarvaro(id):
         "avvikelse": avvikelse
       }
       lista.append(narvaro_entry)
-  return lista
+  return sorted(lista,key=itemgetter('start'))
 
-def getKlass():
-  r5 = s2.get("https://www.vklass.se/Class.aspx")
+def getKlass(s):
+  r5 = s.get("https://www.vklass.se/Class.aspx")
   elever = []
   for data in r5.text.split("teacherStudentLink"):
     row = data.split('Info & resultat')[0]
@@ -126,17 +110,22 @@ def getKlass():
       elever.append(student)
   return elever
 
-if args["<action>"] == "narvaro":
-  print(getNarvaro("e5903f64-c3f9-45ad-94d3-36cefa481484"))
+if __name__ == "__main__":
+  from docopt import docopt
+  args = docopt(__doc__)
 
-if args["<action>"] == "elever":
-  print(getKlass())
+  if args["<action>"] == "narvaro":
+    print(getNarvaro(login(args["<username>"],args["<password>"]),"e5903f64-c3f9-45ad-94d3-36cefa481484"))
 
-if args["<action>"] == "narvaroklass":
-  data = []
-  for elev in getKlass():
-    elev["narvaro"] = getNarvaro(elev["uuid"])
-    data.append(elev)
-  print(json.dumps(data, default=json_serial))
+  if args["<action>"] == "elever":
+    print(getKlass(login(args["<username>"],args["<password>"])))
+
+  if args["<action>"] == "narvaroklass":
+    data = []
+    s = login(args["<username>"],args["<password>"])
+    for elev in getKlass(s):
+      elev["narvaro"] = getNarvaro(s,elev["uuid"])
+      data.append(elev)
+      print(json.dumps(data, default=json_serial))
 
 
