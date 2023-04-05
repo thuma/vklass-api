@@ -64,6 +64,25 @@ def json_serial(obj):
         return obj.isoformat()
     raise TypeError ("Type %s not serializable" % type(obj))
 
+def dateFromString(manad):
+  manader = {
+	"januari":1,
+	"februari":2,
+	"mars":3,
+	"april":4,
+        "maj":5,
+        "juni":6,
+        "juli":7,
+        "augusti":8,
+        "september":9,
+        "oktober":10,
+        "november":11,
+        "december":12
+	}
+  try:
+    return manader[manad]
+  except:
+    return 1
 
 def getNarvaro(s,id):
   r5 = s.get("https://www.vklass.se/statistics/attendanceDetailed.aspx?userUID="+id)
@@ -78,8 +97,8 @@ def getNarvaro(s,id):
       time = info[1].replace("kl: ","").split(" - ")
       hhmm = time[0].split(":")
       ehhmm = time[1].split(":")
-      start = datetime(int(date[3]), 12, int(date[1]),int(hhmm[0]),int(hhmm[1]))
-      end = datetime(int(date[3]), 12, int(date[1]),int(ehhmm[0]),int(ehhmm[1]))
+      start = datetime(int(date[3]), dateFromString(date[2]), int(date[1]),int(hhmm[0]),int(hhmm[1]))
+      end = datetime(int(date[3]), dateFromString(date[2]), int(date[1]),int(ehhmm[0]),int(ehhmm[1]))
       lektion = info[2].replace("Kurs: ","").strip()
       status = info[3].replace("Status: ","").strip()
       avvikelse = 0

@@ -4,9 +4,13 @@ import json
 from bottle import route, run, response, post, get, request
 from login import login, getKlass, json_serial,  getNarvaro
 
-@route('/narvaro')
+
+@route('/narvaro', method=['OPTIONS'])
+def option():
+    return ""
+
+@get('/narvaro')
 def narvaro():
-    response.set_header('Access-Control-Allow-Origin', '*')
     try:
       (user, password) = request.auth
     except Exception as pwd:
@@ -22,6 +26,7 @@ def narvaro():
     klass = getKlass(s)
     for i, elev in enumerate(klass):
       klass[i]["tider"] = getNarvaro(s, elev["uuid"])
-    return json.dumps(klass, default=json_serial)
+    response.content_type = 'application/json'
+    return json.dumps({"klass":klass}, default=json_serial)
 
 run(host='localhost', port=8567)
