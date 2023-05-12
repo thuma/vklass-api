@@ -29,10 +29,12 @@ def login(user, pwd):
   headers["Host"] = "auth.goteborg.se"
   headers["Origin"] = "https://auth.goteborg.se"
   headers["Referer"] = "https://auth.goteborg.se/auth/login"
-  cookie_obj = requests.cookies.create_cookie(name="WASReqURL",value="http:///auth/Responder")
-  s.cookies.set_cookie(cookie_obj)
 
-  r2 = s.post('https://auth.goteborg.se/auth/j_security_check', data={'j_username':user,'j_password':pwd,'pw':'','login':'Logga in'}, headers = headers)
+  path = r.text.split('form class="c-form" method="POST" name="loginform" id="loginform" action="')[1].split('"')[0]
+  keytarget = r.text.split('input type="hidden" name="templateTarget" value="')[1].split('"')[0]
+
+  r2 = s.post('https://auth.goteborg.se'+path, data={'username':user,'password':pwd,'operation':'verify','gbgtemplate':'login','templateTarget':keytarget}, headers = headers)
+
   if r2.text.__contains__('name="SAMLResponse" value="'):
     saml = r2.text.split('name="SAMLResponse" value="')[1].split('"')[0]
   else:
